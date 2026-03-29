@@ -227,18 +227,44 @@ const DUMMY_SESSIONS: ChatSession[] = [
 
 export function NeoDashboard() {
     // STATE
+    const [mounted, setMounted] = useState(false)
     const [sessions, setSessions] = useState<ChatSession[]>([])
     const [currentSessionId, setCurrentSessionId] = useState<string>("")
     const [input, setInput] = useState("")
     const [isMeetingMode, setIsMeetingMode] = useState(false)
+    const [isTyping, setIsTyping] = useState(false)
     const [summaryView, setSummaryView] = useState<"general" | "team">("general")
     const [isOpenCommand, setIsOpenCommand] = useState(false)
-    const [activeTab, setActiveTab] = useState("home")
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+    const [activeTab, setActiveTab ] = useState("home")
     
+    // User Identity State
+    const [userName, setUserName] = useState("Operator 01")
+    const [userPfp, setUserPfp] = useState("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=80")
+    const [neoName, setNeoName] = useState("Terminal Neo")
+    const [neoPfp, setNeoPfp] = useState("") 
+
+    // Attachments State
+    const [attachments, setAttachments] = useState<{ name: string; type: "image" | "doc" | "video"; url?: string }[]>([])
+
+    // Layout Refs
+    const leftPanelRef = useRef<any>(null)
+    const [isLeftCollapsed, setIsLeftCollapsed ] = useState(false)
+
     const scrollRef = useRef<HTMLDivElement>(null)
+    const messagesEndRef = useRef<HTMLDivElement>(null)
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    }
+
+    useEffect(() => {
+        scrollToBottom()
+    }, [sessions, currentSessionId, isTyping])
 
     // INITIAL LOAD & PERSISTENCE
     useEffect(() => {
+        setMounted(true)
         const saved = localStorage.getItem("neo_sessions_v3")
         if (saved) {
             const parsed = JSON.parse(saved)
@@ -247,6 +273,15 @@ export function NeoDashboard() {
         } else {
             setSessions(DUMMY_SESSIONS)
             setCurrentSessionId(DUMMY_SESSIONS[0].id)
+        }
+
+        const savedIdentity = localStorage.getItem("neo_identity")
+        if (savedIdentity) {
+            const { userName, userPfp, neoName, neoPfp } = JSON.parse(savedIdentity)
+            if (userName) setUserName(userName)
+            if (userPfp) setUserPfp(userPfp)
+            if (neoName) setNeoName(neoName)
+            if (neoPfp !== undefined) setNeoPfp(neoPfp)
         }
 
         const down = (e: KeyboardEvent) => {
@@ -265,40 +300,50 @@ export function NeoDashboard() {
         }
     }, [sessions])
 
+    useEffect(() => {
+        if (mounted) {
+            localStorage.setItem("neo_identity", JSON.stringify({ userName, userPfp, neoName, neoPfp }))
+        }
+    }, [userName, userPfp, neoName, neoPfp, mounted])
+
     const currentSession = sessions.find(s => s.id === currentSessionId)
 
     // LOGIC
-    const handleSend = () => {
-        if (!input.trim() || !currentSessionId) return
+    const handleSend = async () => {
+        if ((!input.trim() && attachments.length === 0) || !currentSessionId || isTyping) return
 
-        const newMessage: Message = { 
+        const userMsg: Message = { 
             role: "user", 
-            content: input,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            content: input.trim() || (attachments.length > 0 ? `Sent ${attachments.length} attachment(s)` : ""),
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            data: attachments.length > 0 ? { attachments: [...attachments] } : undefined
         }
 
-        setSessions(prev => prev.map(s => {
-            if (s.id === currentSessionId) {
-                return { ...s, messages: [...s.messages, newMessage] }
-            }
-            return s
-        }))
         setInput("")
-
-        // Neo Interaction Simulation
+        setAttachments([])
         setSessions(prev => prev.map(s => {
             if (s.id === currentSessionId) {
-                return { ...s, messages: [...s.messages, { role: "neo", content: "...", type: "skeleton", timestamp: "typing..." }] }
+                return { ...s, messages: [...s.messages, userMsg] }
             }
             return s
         }))
 
-        setTimeout(() => {
-            const neoResponse = generateNeoResponse(input)
+        setIsTyping(true)
+
+        try {
+            const response = await fetch("/api/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ messages: currentSession?.messages.concat(userMsg) || [userMsg] })
+            })
+
+            if (!response.ok) throw new Error("Neural link failed.")
+
+            const data = await response.json()
+            
             setSessions(prev => prev.map(s => {
                 if (s.id === currentSessionId) {
-                    const filteredMessages = s.messages.filter(m => m.type !== "skeleton")
-                    const newMessages = [...filteredMessages, neoResponse]
+                    const newMessages = [...s.messages, data]
                     return { 
                         ...s, 
                         messages: newMessages,
@@ -308,7 +353,12 @@ export function NeoDashboard() {
                 return s
             }))
             toast.success("Intelligence updated.")
-        }, 1500)
+        } catch (error) {
+            toast.error("Network synchronization failed.")
+            console.error(error)
+        } finally {
+            setIsTyping(false)
+        }
     }
 
     const generateNeoResponse = (userInput: string): Message => {
@@ -372,6 +422,8 @@ export function NeoDashboard() {
         }))
     }
 
+    if (!mounted) return <div className="h-screen w-full bg-[#050505]" />
+
     return (
         <div className="h-screen w-full overflow-hidden bg-[#050505] text-slate-300 font-sans selection:bg-blue-600/30">
             <CommandDialog open={isOpenCommand} onOpenChange={setIsOpenCommand}>
@@ -402,12 +454,100 @@ export function NeoDashboard() {
                 </div>
             </CommandDialog>
 
-            <ResizablePanelGroup orientation="horizontal" className="h-full w-full">
+            <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+                <DialogContent className="bg-[#0A0A0A] border-white/5 text-slate-300 max-w-2xl rounded-[2.5rem] shadow-2xl p-0 overflow-hidden">
+                    <div className="p-10 border-b border-white/5 bg-gradient-to-br from-blue-600/10 to-transparent">
+                        <DialogTitle className="text-white uppercase tracking-[0.3em] font-black text-xl mb-2">Neural Customization</DialogTitle>
+                        <DialogDescription className="text-slate-500">Reprogram the core identity vectors for optimal synchronization.</DialogDescription>
+                    </div>
+                    <ScrollArea className="max-h-[60vh] p-10">
+                        <div className="space-y-12">
+                            <section>
+                                <h4 className="text-[11px] font-black uppercase tracking-[0.4em] text-blue-500 mb-8 px-2 flex items-center gap-3">
+                                    <User className="h-4 w-4" /> Operator Identity
+                                </h4>
+                                <div className="grid gap-8 bg-white/[0.02] border border-white/5 p-8 rounded-3xl shadow-xl">
+                                    <Field>
+                                        <FieldLabel className="text-[10px] uppercase font-black tracking-widest text-slate-600 mb-3">Operator Name</FieldLabel>
+                                        <Input 
+                                            value={userName} 
+                                            onChange={(e) => setUserName(e.target.value)}
+                                            className="bg-white/5 border-none h-12 rounded-xl text-[14px] font-bold text-white placeholder:text-slate-800"
+                                            placeholder="Enter your callsign..."
+                                        />
+                                    </Field>
+                                    <Field>
+                                        <FieldLabel className="text-[10px] uppercase font-black tracking-widest text-slate-600 mb-3">Avatar Uplink (URL)</FieldLabel>
+                                        <Input 
+                                            value={userPfp} 
+                                            onChange={(e) => setUserPfp(e.target.value)}
+                                            className="bg-white/5 border-none h-12 rounded-xl text-[14px] font-bold text-white placeholder:text-slate-800"
+                                            placeholder="https://..."
+                                        />
+                                    </Field>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h4 className="text-[11px] font-black uppercase tracking-[0.4em] text-amber-500 mb-8 px-2 flex items-center gap-3">
+                                    <Cpu className="h-4 w-4" /> Neo AI Persona
+                                </h4>
+                                <div className="grid gap-8 bg-white/[0.02] border border-white/5 p-8 rounded-3xl shadow-xl">
+                                    <Field>
+                                        <FieldLabel className="text-[10px] uppercase font-black tracking-widest text-slate-600 mb-3">System Name</FieldLabel>
+                                        <Input 
+                                            value={neoName} 
+                                            onChange={(e) => setNeoName(e.target.value)}
+                                            className="bg-white/5 border-none h-12 rounded-xl text-[14px] font-bold text-white placeholder:text-slate-800"
+                                            placeholder="Assign a system identifier..."
+                                        />
+                                    </Field>
+                                    <Field>
+                                        <FieldLabel className="text-[10px] uppercase font-black tracking-widest text-slate-600 mb-3">System Avatar (URL)</FieldLabel>
+                                        <Input 
+                                            value={neoPfp} 
+                                            onChange={(e) => setNeoPfp(e.target.value)}
+                                            className="bg-white/5 border-none h-12 rounded-xl text-[14px] font-bold text-white placeholder:text-slate-800"
+                                            placeholder="Custom system icon URL..."
+                                        />
+                                    </Field>
+                                </div>
+                            </section>
+                        </div>
+                    </ScrollArea>
+                    <DialogFooter className="p-10 bg-black/40 border-t border-white/5">
+                        <Button onClick={() => setIsSettingsOpen(false)} className="w-full h-14 bg-blue-600 hover:bg-blue-700 rounded-2xl text-[11px] font-black uppercase tracking-[0.4em] shadow-[0_0_30px_rgba(37,99,235,0.3)]">Save Optimization</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <ResizablePanelGroup direction="horizontal" className="h-full w-full">
                 
                 {/* 1. FAR LEFT: COMMAND SIDEBAR (Fixed Nav) */}
-                <ResizablePanel defaultSize={4} minSize={4} maxSize={5} className="border-r border-white/5 bg-[#080808]">
+                <ResizablePanel 
+                    ref={leftPanelRef}
+                    defaultSize={4} 
+                    minSize={3} 
+                    maxSize={10} 
+                    collapsible={true}
+                    onCollapse={() => setIsLeftCollapsed(true)}
+                    onExpand={() => setIsLeftCollapsed(false)}
+                    className="border-r border-white/5 bg-[#080808] transition-all duration-300"
+                >
                     <div className="flex flex-col items-center h-full py-6">
-                        <div className="h-10 w-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white mb-10 shadow-[0_0_20px_rgba(37,99,235,0.2)]">
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => {
+                                if (isLeftCollapsed) leftPanelRef.current?.expand()
+                                else leftPanelRef.current?.collapse()
+                            }}
+                            className="mb-8 hover:bg-white/5 rounded-xl text-slate-500 hover:text-white transition-all active:scale-90"
+                        >
+                            <ChevronRight className={`h-4 w-4 transition-transform duration-500 ${!isLeftCollapsed ? 'rotate-180' : ''}`} />
+                        </Button>
+
+                        <div className={`h-10 w-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white mb-10 shadow-[0_0_20px_rgba(37,99,235,0.2)] transition-all duration-500 ${isLeftCollapsed ? 'scale-75 opacity-50' : ''}`}>
                             <Cpu className="h-6 w-6" />
                         </div>
                         
@@ -524,10 +664,19 @@ export function NeoDashboard() {
                                 <DropdownMenuContent className="bg-[#111111] border-white/5 text-slate-300 w-64 p-2 shadow-2xl" align="end" side="right">
                                     <DropdownMenuLabel className="font-black uppercase tracking-widest text-[11px] px-3 py-2 text-white/50">Core Identity</DropdownMenuLabel>
                                     <DropdownMenuSeparator className="bg-white/5" />
-                                    <DropdownMenuItem className="rounded-lg px-3 py-2 hover:bg-blue-600 hover:text-white transition-colors cursor-pointer">Security Protocol</DropdownMenuItem>
-                                    <DropdownMenuItem className="rounded-lg px-3 py-2 hover:bg-blue-600 hover:text-white transition-colors cursor-pointer">Neural Settings</DropdownMenuItem>
+                                    <DropdownMenuItem className="rounded-lg px-3 py-2 hover:bg-blue-600 hover:text-white transition-colors cursor-pointer flex items-center gap-3">
+                                        <Lock className="h-3.5 w-3.5" /> Security Protocol
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                        onClick={() => setIsSettingsOpen(true)}
+                                        className="rounded-lg px-3 py-2 hover:bg-blue-600 hover:text-white transition-colors cursor-pointer flex items-center gap-3"
+                                    >
+                                        <Settings className="h-3.5 w-3.5" /> Neural Settings
+                                    </DropdownMenuItem>
                                     <DropdownMenuSeparator className="bg-white/5" />
-                                    <DropdownMenuItem className="rounded-lg px-3 py-2 text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer">Sever Connection</DropdownMenuItem>
+                                    <DropdownMenuItem className="rounded-lg px-3 py-2 text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer flex items-center gap-3">
+                                        <AlertCircle className="h-3.5 w-3.5" /> Sever Connection
+                                    </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </div>
@@ -706,14 +855,26 @@ export function NeoDashboard() {
                                                 ? 'bg-blue-600 text-white shadow-[0_0_30px_rgba(37,99,235,0.4)]' 
                                                 : 'bg-[#111111] border border-white/5 text-slate-600 shadow-xl'
                                             }`}>
-                                                {msg.role === 'neo' ? <Terminal className="h-5 w-5" /> : <User className="h-5 w-5" />}
+                                                {msg.role === 'neo' ? (
+                                                    neoPfp ? (
+                                                        <Avatar className="h-full w-full rounded-2xl">
+                                                            <AvatarImage src={neoPfp} />
+                                                            <AvatarFallback><Terminal className="h-5 w-5" /></AvatarFallback>
+                                                        </Avatar>
+                                                    ) : <Terminal className="h-5 w-5" />
+                                                ) : (
+                                                    <Avatar className="h-full w-full rounded-2xl">
+                                                        <AvatarImage src={userPfp} />
+                                                        <AvatarFallback><User className="h-5 w-5" /></AvatarFallback>
+                                                    </Avatar>
+                                                )}
                                                 {msg.role === 'neo' && <div className="absolute -top-1 -right-1 h-3.5 w-3.5 bg-green-500 border-3 border-[#050505] rounded-full" />}
                                             </div>
                                             
                                             <div className={`flex flex-col space-y-4 max-w-[85%] ${msg.role === 'user' ? 'items-end' : ''}`}>
                                                 <div className="flex items-center gap-3 px-2">
                                                     <span className={`text-[10px] font-black uppercase tracking-[0.3em] ${msg.role === 'neo' ? 'text-blue-500' : 'text-slate-600'}`}>
-                                                        {msg.role === 'neo' ? 'Terminal Neo' : 'Operator 01'}
+                                                        {msg.role === 'neo' ? neoName : userName}
                                                     </span>
                                                     <span className="text-[10px] text-white/5">•</span>
                                                     <span className="text-[10px] text-slate-800 font-bold">{msg.timestamp}</span>
@@ -820,12 +981,57 @@ export function NeoDashboard() {
                                             </div>
                                         </div>
                                     ))}
+                                    {isTyping && (
+                                        <div className="flex gap-8 animate-in fade-in slide-in-from-bottom-2">
+                                            <div className="mt-2 h-11 w-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 relative shadow-[0_0_30px_rgba(37,99,235,0.4)]">
+                                                <Terminal className="h-5 w-5" />
+                                            </div>
+                                            <div className="flex flex-col space-y-4 max-w-[85%]">
+                                                <div className="flex items-center gap-3 px-2">
+                                                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-500">{neoName}</span>
+                                                    <span className="text-[10px] text-slate-800 font-bold italic">Typing...</span>
+                                                </div>
+                                                <Card className="p-6 bg-[#0A0A0A] border-l-2 border-l-blue-600/50 rounded-[2.5rem] rounded-tl-none border-none shadow-2xl">
+                                                    <div className="flex gap-2">
+                                                        <div className="h-2 w-2 rounded-full bg-blue-600 animate-bounce [animation-delay:-0.3s]" />
+                                                        <div className="h-2 w-2 rounded-full bg-blue-600 animate-bounce [animation-delay:-0.15s]" />
+                                                        <div className="h-2 w-2 rounded-full bg-blue-600 animate-bounce" />
+                                                    </div>
+                                                </Card>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div ref={messagesEndRef} />
                                 </div>
                             </ScrollArea>
 
                             {/* INPUT ENGINE */}
                             <div className="p-10 bg-[#050505] border-t border-white/5 shadow-2xl">
                                 <div className="max-w-4xl mx-auto">
+                                    {attachments.length > 0 && (
+                                        <div className="flex gap-4 mb-6 p-4 bg-white/5 rounded-3xl animate-in zoom-in-95 duration-300">
+                                            {attachments.map((file, idx) => (
+                                                <div key={idx} className="relative group/file">
+                                                    <div className="h-20 w-20 rounded-2xl bg-[#0A0A0A] border border-white/10 flex items-center justify-center overflow-hidden shadow-2xl">
+                                                        {file.type === "image" ? (
+                                                            <img src={file.url} className="h-full w-full object-cover" />
+                                                        ) : (
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <Paperclip className="h-6 w-6 text-blue-500" />
+                                                                <span className="text-[8px] font-black uppercase tracking-tighter text-slate-500 truncate max-w-[60px] px-2">{file.name}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))}
+                                                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-600 text-white flex items-center justify-center shadow-lg opacity-0 group-hover/file:opacity-100 transition-all scale-75 group-hover/file:scale-100"
+                                                    >
+                                                        <Trash2 className="h-3 w-3" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                     <div className="relative group">
                                         <Textarea
                                             placeholder={isMeetingMode ? "Neo Core is listening to the sync... Processing... 🎙️" : "Initiate command sequence or converse with Neo AI..."}
@@ -836,19 +1042,42 @@ export function NeoDashboard() {
                                         />
                                         <div className="absolute right-8 bottom-8 flex gap-4">
                                             <TooltipProvider>
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
+                                                <Popover>
+                                                    <PopoverTrigger asChild>
                                                         <Button variant="ghost" size="icon" className="h-12 w-12 text-slate-600 hover:bg-white/5 rounded-2xl transition-all">
                                                             <Paperclip className="h-5 w-5" />
                                                         </Button>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>Inject Payload</TooltipContent>
-                                                </Tooltip>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent side="top" className="bg-[#111111] border-white/5 text-slate-300 rounded-2xl w-56 p-2 shadow-2xl mb-4">
+                                                        <div className="grid gap-1">
+                                                            <button 
+                                                                onClick={() => setAttachments(prev => [...prev, { name: "design_draft.pdf", type: "doc" }])}
+                                                                className="text-[11px] font-bold uppercase tracking-widest flex items-center gap-3 hover:bg-white/5 p-3 rounded-xl transition-colors cursor-pointer w-full text-left"
+                                                            >
+                                                                <Plus className="h-3.5 w-3.5" /> Upload Document
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => setAttachments(prev => [...prev, { name: "neural_net.png", type: "image", url: "https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=200&q=80" }])}
+                                                                className="text-[11px] font-bold uppercase tracking-widest flex items-center gap-3 hover:bg-white/5 p-3 rounded-xl transition-colors cursor-pointer w-full text-left"
+                                                            >
+                                                                <ImageIcon className="h-3.5 w-3.5" /> Upload Image
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => setAttachments(prev => [...prev, { name: "sync_demo.mp4", type: "video" }])}
+                                                                className="text-[11px] font-bold uppercase tracking-widest flex items-center gap-3 hover:bg-white/5 p-3 rounded-xl transition-colors cursor-pointer w-full text-left"
+                                                            >
+                                                                <Video className="h-3.5 w-3.5" /> Upload Video
+                                                            </button>
+                                                        </div>
+                                                    </PopoverContent>
+                                                </Popover>
                                                 <Button 
                                                     onClick={handleSend}
-                                                    className="h-12 px-10 rounded-2xl bg-blue-600 hover:bg-blue-700 shadow-[0_0_30px_rgba(37,99,235,0.4)] transition-all font-black text-[11px] tracking-[0.3em] uppercase active:scale-95"
+                                                    disabled={isTyping || (!input.trim() && attachments.length === 0)}
+                                                    className="h-12 px-10 rounded-2xl bg-blue-600 hover:bg-blue-700 shadow-[0_0_30px_rgba(37,99,235,0.4)] transition-all font-black text-[11px] tracking-[0.3em] uppercase active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed group"
                                                 >
-                                                    Compute
+                                                    <Zap className="h-4 w-4 mr-3 group-hover:animate-pulse" />
+                                                    {isTyping ? "Processing" : "Compute"}
                                                 </Button>
                                             </TooltipProvider>
                                         </div>
