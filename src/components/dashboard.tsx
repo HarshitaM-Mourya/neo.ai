@@ -258,38 +258,74 @@ export function NeoDashboard() {
     const [isLeftCollapsed, setIsLeftCollapsed] = useState(true)
     const [isArchiveCollapsed, setIsArchiveCollapsed] = useState(true)
     const [isRightCollapsed, setIsRightCollapsed] = useState(true)
+    const [selectedDay, setSelectedDay] = useState(6) // Default to today (last index)
+
+    const days = [
+        { day: "TUE", date: "24" },
+        { day: "WED", date: "25" },
+        { day: "THU", date: "26" },
+        { day: "FRI", date: "27" },
+        { day: "SAT", date: "28" },
+        { day: "SUN", date: "29" },
+        { day: "MON", date: "30" }
+    ]
 
     const scrollRef = useRef<HTMLDivElement>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+        setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
+        }, 150)
     }
 
     useEffect(() => {
         scrollToBottom()
     }, [sessions, currentSessionId, isTyping])
 
-    // INITIAL LOAD & PERSISTENCE
+    // 1. INITIAL MOUNT & INTELLIGENCE RECOVERY
     useEffect(() => {
         setMounted(true)
-        const saved = localStorage.getItem("neo_sessions_v3")
+        const saved = localStorage.getItem("neo_sessions_v5")
+        let baseSessions = DUMMY_SESSIONS
+        
         if (saved) {
-            const parsed = JSON.parse(saved)
-            setSessions(parsed)
-            if (parsed.length > 0) setCurrentSessionId(parsed[0].id)
-        } else {
-            setSessions(DUMMY_SESSIONS)
-            setCurrentSessionId(DUMMY_SESSIONS[0].id)
+            try {
+                const parsed = JSON.parse(saved)
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    baseSessions = parsed
+                }
+            } catch (e) {
+                console.error("Neural recovery failed", e)
+            }
         }
 
+        // AUTO-FRESH: Always start with a new cycle on launch
+        const freshCycle: ChatSession = {
+            id: Date.now().toString(),
+            title: `Fresh Cycle ${baseSessions.length + 1}`,
+            date: new Date().toISOString().split('T')[0],
+            isMeeting: false,
+            summary: "Neural start-up: sequence optimized and memory trace active.",
+            messages: [{ 
+                role: "neo", 
+                content: "Neural uplink established. Ready for input, kiri.", 
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+            }]
+        }
+
+        const finalSessions = [freshCycle, ...baseSessions]
+        setSessions(finalSessions)
+        setCurrentSessionId(freshCycle.id)
+
+        // Recovery Identity
         const savedIdentity = localStorage.getItem("neo_identity")
         if (savedIdentity) {
-            const { userName, userPfp, neoName, neoPfp } = JSON.parse(savedIdentity)
-            if (userName) setUserName(userName)
-            if (userPfp) setUserPfp(userPfp)
-            if (neoName) setNeoName(neoName)
-            if (neoPfp !== undefined) setNeoPfp(neoPfp)
+            const parsedIdentity = JSON.parse(savedIdentity)
+            if (parsedIdentity.userName) setUserName(parsedIdentity.userName)
+            if (parsedIdentity.userPfp) setUserPfp(parsedIdentity.userPfp)
+            if (parsedIdentity.neoName) setNeoName(parsedIdentity.neoName)
+            if (parsedIdentity.neoPfp !== undefined) setNeoPfp(parsedIdentity.neoPfp)
         }
 
         const down = (e: KeyboardEvent) => {
@@ -302,11 +338,12 @@ export function NeoDashboard() {
         return () => document.removeEventListener("keydown", down)
     }, [])
 
+    // 2. REAL-TIME INTELLIGENCE SYNC (PERSISTENCE)
     useEffect(() => {
-        if (sessions.length > 0) {
-            localStorage.setItem("neo_sessions_v3", JSON.stringify(sessions))
+        if (mounted && sessions.length > 0) {
+            localStorage.setItem("neo_sessions_v5", JSON.stringify(sessions))
         }
-    }, [sessions])
+    }, [sessions, mounted])
 
     useEffect(() => {
         if (mounted) {
@@ -454,10 +491,10 @@ export function NeoDashboard() {
 
     const toggleSidebars = () => {
         if (isZenMode) {
-            // Expand to 'Ultra Vision' percentages
-            leftPanelRef.current?.expand(20)
-            archivePanelRef.current?.expand(30)
-            rightPanelRef.current?.expand(35)
+            // Rebalanced Hyper-Scale Dimensions for unified expansion
+            leftPanelRef.current?.expand(15)
+            archivePanelRef.current?.expand(40)
+            rightPanelRef.current?.expand(40)
             setIsZenMode(false)
             setIsLeftCollapsed(false)
             setIsArchiveCollapsed(false)
@@ -470,6 +507,18 @@ export function NeoDashboard() {
             setIsLeftCollapsed(true)
             setIsArchiveCollapsed(true)
             setIsRightCollapsed(true)
+        }
+    }
+
+    const autoOpen = () => {
+        if (isZenMode) {
+            leftPanelRef.current?.expand(15)
+            archivePanelRef.current?.expand(40)
+            rightPanelRef.current?.expand(40)
+            setIsZenMode(false)
+            setIsLeftCollapsed(false)
+            setIsArchiveCollapsed(false)
+            setIsRightCollapsed(false)
         }
     }
 
@@ -610,7 +659,7 @@ export function NeoDashboard() {
                     ref={leftPanelRef}
                     defaultSize={0}
                     minSize={0}
-                    maxSize={50}
+                    maxSize={100}
                     collapsible={true}
                     className="border-r border-blue-500/15 bg-gradient-to-b from-[#111111] via-[#0D0D0D] to-[#0A0A0A] transition-all duration-500 shadow-[2px_0_30px_rgba(37,99,235,0.05)]"
                 >
@@ -632,7 +681,7 @@ export function NeoDashboard() {
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <Button variant={activeTab === 'home' ? 'secondary' : 'ghost'} size="icon" onClick={() => setActiveTab('home')} className="rounded-xl h-10 w-10 transition-all hover:scale-110">
+                                        <Button variant={activeTab === 'home' ? 'secondary' : 'ghost'} size="icon" onClick={() => { setActiveTab('home'); autoOpen(); }} className="rounded-xl h-10 w-10 transition-all hover:scale-110">
                                             <LayoutDashboard className="h-5 w-5" />
                                         </Button>
                                     </TooltipTrigger>
@@ -641,7 +690,7 @@ export function NeoDashboard() {
 
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="icon" onClick={() => setIsOpenCommand(true)} className="rounded-xl h-10 w-10 text-slate-500 hover:text-white">
+                                        <Button variant="ghost" size="icon" onClick={() => { setIsOpenCommand(true); autoOpen(); }} className="rounded-xl h-10 w-10 text-slate-500 hover:text-white">
                                             <Search className="h-5 w-5" />
                                         </Button>
                                     </TooltipTrigger>
@@ -652,7 +701,7 @@ export function NeoDashboard() {
                                     <TooltipTrigger asChild>
                                         <Sheet>
                                             <SheetTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10 text-slate-500 hover:text-amber-500">
+                                                <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10 text-slate-500 hover:text-amber-500" onClick={autoOpen}>
                                                     <Trophy className="h-5 w-5" />
                                                 </Button>
                                             </SheetTrigger>
@@ -679,7 +728,7 @@ export function NeoDashboard() {
                                     <TooltipTrigger asChild>
                                         <Drawer>
                                             <DrawerTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10 text-slate-500 hover:text-white">
+                                                <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10 text-slate-500 hover:text-white" onClick={autoOpen}>
                                                     <Activity className="h-5 w-5" />
                                                 </Button>
                                             </DrawerTrigger>
@@ -745,7 +794,7 @@ export function NeoDashboard() {
                                         <Lock className="h-3.5 w-3.5" /> Security Protocol
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
-                                        onClick={() => setIsSettingsOpen(true)}
+                                        onClick={() => { setIsSettingsOpen(true); autoOpen(); }}
                                         className="rounded-lg px-3 py-2 hover:bg-blue-600 hover:text-white transition-colors cursor-pointer flex items-center gap-3"
                                     >
                                         <Settings className="h-3.5 w-3.5" /> Neural Settings
@@ -767,7 +816,7 @@ export function NeoDashboard() {
                     ref={archivePanelRef}
                     defaultSize={0} 
                     minSize={0} 
-                    maxSize={50} 
+                    maxSize={100} 
                     collapsible={true}
                     className="bg-gradient-to-br from-[#0D0D0D] to-[#050505] border-r border-blue-500/15"
                 >
@@ -838,7 +887,7 @@ export function NeoDashboard() {
                                                             {s.isMeeting ? <Video className="h-3.5 w-3.5 text-blue-500" /> : <MessageSquare className="h-3.5 w-3.5 text-blue-500" />}
                                                             Summary
                                                         </h4>
-                                                        <p className="text-[12px] leading-relaxed text-slate-400 italic">"{s.summary}"</p>
+                                                        <p className="text-[12px] leading-relaxed text-slate-400 italic">"{s.summary?.slice(0, 100)}..."</p>
                                                     </div>
                                                     <div className="p-4 bg-black/40 flex justify-between items-center gap-4">
                                                         <div className="flex gap-1">
@@ -872,10 +921,10 @@ export function NeoDashboard() {
                     </div>
                 </ResizablePanel>
 
-                <ResizableHandle withHandle className="bg-blue-600/30 w-[1px] hover:bg-blue-500 transition-colors" />
+                <ResizableHandle withHandle className="bg-blue-600/30 w-1.5 hover:bg-blue-500 hover:w-2 transition-all duration-300 shadow-[0_0_15px_rgba(37,99,235,0.2)]" />
 
                 {/* 3. MAIN CHAT STAGE */}
-                <ResizablePanel ref={chatPanelRef} defaultSize={100} minSize={40}>
+                <ResizablePanel ref={chatPanelRef} defaultSize={100} minSize={5}>
                     <div className="flex-1 flex flex-col relative h-full bg-[#050505]">
                         {/* 3.1 CHAT CORE */}
                         <div className="flex-1 flex flex-col relative h-full">
@@ -1001,7 +1050,7 @@ export function NeoDashboard() {
                                                             <Skeleton className="h-4 w-[280px] bg-white/5 rounded-lg opacity-50" />
                                                         </div>
                                                     ) : (
-                                                        <div className="prose prose-invert prose-p:leading-[1.8] prose-p:text-[16px] prose-p:font-serif prose-p:opacity-90 prose-p:tracking-wide prose-p:text-slate-300 max-w-none">
+                                                        <div className="prose prose-invert prose-p:leading-[1.8] prose-p:text-[15px] prose-p:opacity-90 prose-p:tracking-normal prose-p:text-slate-300 max-w-none prose-p:mb-10 last:prose-p:mb-0 selection:bg-blue-600/30">
                                                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                                                 {msg.content}
                                                             </ReactMarkdown>
@@ -1010,19 +1059,19 @@ export function NeoDashboard() {
 
                                                     {/* DATA MATRIX (TABLE) */}
                                                     {msg.type === 'table' && msg.data && (
-                                                        <div className="mt-8 border border-white/5 rounded-3xl overflow-hidden bg-black/40 backdrop-blur-2xl shadow-inner transition-all">
-                                                            <Table>
-                                                                <TableHeader className="bg-white/5">
-                                                                    <TableRow className="border-white/5 hover:bg-transparent">
-                                                                        {Object.keys(msg.data[0]).map(k => <TableHead key={k} className="text-[10px] font-black uppercase text-slate-500 tracking-widest py-3 h-12 px-6">{k}</TableHead>)}
+                                                        <div className="mt-10 border border-white/10 rounded-[2rem] overflow-hidden bg-black/40 backdrop-blur-3xl shadow-[0_30px_100px_rgba(0,0,0,0.4)] transition-all border-l-4 border-l-blue-600">
+                                                            <Table className="border-collapse">
+                                                                <TableHeader className="bg-white/[0.03]">
+                                                                    <TableRow className="border-white/10 hover:bg-transparent">
+                                                                        {Object.keys(msg.data[0]).map(k => <TableHead key={k} className="text-[10px] font-black uppercase text-blue-500 tracking-[0.2em] py-5 h-14 px-8 border-b border-white/10">{k}</TableHead>)}
                                                                     </TableRow>
                                                                 </TableHeader>
-                                                                <TableBody>
+                                                                <TableBody className="divide-y divide-white/5">
                                                                     {msg.data.map((row: any, ri: number) => (
-                                                                        <TableRow key={ri} className="border-white/5 hover:bg-blue-600/5 transition-colors">
+                                                                        <TableRow key={ri} className="border-white/5 hover:bg-blue-600/5 transition-colors group/row">
                                                                             {Object.values(row).map((v: any, vi) => (
-                                                                                <TableCell key={vi} className="text-[13px] py-4 px-6 font-bold text-slate-400">
-                                                                                    {String(v).includes('Stable') ? <Badge className="bg-green-500/10 text-green-500 border-none px-2 py-0 text-[10px] font-black">STABLE</Badge> : v}
+                                                                                <TableCell key={vi} className="text-[13px] py-5 px-8 font-bold text-slate-300 border-l border-white/5 first:border-l-0 group-hover/row:text-white transition-colors">
+                                                                                    {String(v).includes('Stable') ? <Badge className="bg-green-500/10 text-green-500 border border-green-500/20 px-3 py-1 text-[10px] font-black rounded-lg">STABLE</Badge> : v}
                                                                                 </TableCell>
                                                                             ))}
                                                                         </TableRow>
@@ -1216,20 +1265,20 @@ export function NeoDashboard() {
                     </div>
                 </ResizablePanel>
 
-                <ResizableHandle withHandle className="bg-blue-600/30 w-[1px] hover:bg-blue-500 transition-colors" />
+                <ResizableHandle withHandle className="bg-blue-600/30 w-1.5 hover:bg-blue-500 hover:w-2 transition-all duration-300 shadow-[0_0_15px_rgba(37,99,235,0.2)]" />
 
                 {/* 4. SYSTEM INSIGHTS (FAR RIGHT) */}
                 <ResizablePanel 
                     ref={rightPanelRef}
                     defaultSize={0}
                     minSize={0}
-                    maxSize={50}
+                    maxSize={100}
                     collapsible={true}
                     className="bg-[#050505] shadow-2xl border-l border-blue-500/15"
                 >
                     <div className="flex flex-col h-full relative z-30">
-                            <Tabs value={summaryView} onValueChange={(v: any) => setSummaryView(v)} className="flex-1 flex flex-col">
-                                <div className="p-10 border-b border-white/5 bg-[#050505]/50 backdrop-blur-xl">
+                            <Tabs value={summaryView} onValueChange={(v: any) => setSummaryView(v)} className="flex-1 flex flex-col h-full overflow-hidden">
+                                <div className="p-6 border-b border-white/5 bg-[#050505]/50 backdrop-blur-xl">
                                     <div className="flex items-center justify-between mb-8">
                                         <h3 className="text-[12px] font-black text-white/30 uppercase tracking-[0.5em]">System Insights</h3>
                                         <div className="p-1 px-4 bg-blue-600/10 rounded-full text-[10px] font-black text-blue-500 tracking-widest border border-blue-600/20 shadow-2xl">ACTIVE</div>
@@ -1240,17 +1289,52 @@ export function NeoDashboard() {
                                     </TabsList>
                                 </div>
 
-                                <ScrollArea className="flex-1">
-                                    <TabsContent value="general" className="p-10 m-0 space-y-16">
+                                <ScrollArea className="flex-1 h-full w-full">
+                                    <TabsContent value="general" className="p-6 m-0 space-y-10 h-full">
+                                        {/* 2X NEURAL TIMELINE (DATE/DAY SELECTOR) */}
+                                        <div className="mb-12">
+                                            <div className="flex justify-between items-end mb-6 px-4">
+                                                <h4 className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-600">Neural Timeline</h4>
+                                                <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{days[selectedDay].day} MAR {days[selectedDay].date}</span>
+                                            </div>
+                                            <div className="relative h-20 flex items-center group/timeline">
+                                                <Progress 
+                                                    value={(selectedDay / (days.length - 1)) * 100} 
+                                                    className="h-4 bg-white/5 rounded-full absolute w-full transition-all duration-700 shadow-inner" 
+                                                />
+                                                <div className="absolute w-full flex justify-between px-1">
+                                                    {days.map((d, i) => (
+                                                        <div 
+                                                            key={i} 
+                                                            onClick={() => setSelectedDay(i)}
+                                                            className="relative flex flex-col items-center cursor-pointer group/node"
+                                                        >
+                                                            <div className={`h-8 w-8 rounded-full border-2 transition-all duration-500 flex items-center justify-center relative z-10 ${
+                                                                i <= selectedDay 
+                                                                    ? 'bg-blue-600 border-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.6)]' 
+                                                                    : 'bg-[#0A0A0A] border-white/10 group-hover/node:border-white/30'
+                                                            }`}>
+                                                                {i === selectedDay && <div className="h-2 w-2 rounded-full bg-white animate-ping" />}
+                                                            </div>
+                                                            <div className={`mt-4 flex flex-col items-center transition-all duration-500 ${i === selectedDay ? 'scale-110' : 'opacity-40'}`}>
+                                                                <span className="text-[10px] font-black uppercase tracking-widest text-white">{d.day}</span>
+                                                                <span className="text-[12px] font-black text-slate-400 mt-1">{d.date}</span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+
                                         <Accordion type="single" collapsible className="w-full" defaultValue="summary">
                                             <AccordionItem value="summary" className="border-white/5">
                                                 <AccordionTrigger className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-600 hover:no-underline hover:text-blue-500 transition-all py-6">
                                                     Cycle Executive Brief
                                                 </AccordionTrigger>
-                                                <AccordionContent className="pt-6">
-                                                    <div className="p-8 bg-white/[0.03] rounded-[2rem] border border-white/5 italic text-[14px] text-slate-400 leading-[1.8] relative shadow-inner">
+                                                <AccordionContent className="pt-4 overflow-visible">
+                                                    <div className="p-5 bg-white/[0.03] rounded-[2rem] border border-white/5 italic text-[14px] text-slate-400 leading-[1.8] relative shadow-inner w-full break-words overflow-hidden">
                                                         <div className="absolute top-6 left-6 h-4 w-4 text-blue-900 opacity-30"><MessageSquare className="h-full w-full" /></div>
-                                                        "{currentSession?.summary}"
+                                                        <div className="whitespace-pre-wrap pl-8">"{currentSession?.summary}"</div>
                                                     </div>
                                                 </AccordionContent>
                                             </AccordionItem>
@@ -1273,7 +1357,7 @@ export function NeoDashboard() {
                                             </AccordionItem>
                                         </Accordion>
 
-                                        <FieldGroup className="space-y-10">
+                                        <FieldGroup className="space-y-8">
                                             <Field>
                                                 <FieldLabel className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-600 mb-6 flex justify-between w-full">
                                                     Processing Intensity
