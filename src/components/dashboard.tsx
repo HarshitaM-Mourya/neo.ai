@@ -9,7 +9,7 @@ import {
     ResizablePanel,
     ResizablePanelGroup
 } from "@/components/ui/resizable"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -1039,10 +1039,11 @@ export function NeoDashboard() {
                                                     <span className="text-[10px] text-slate-800 font-bold">{msg.timestamp}</span>
                                                 </div>
 
-                                                <Card className={`p-6 rounded-[2.5rem] border-none relative group overflow-hidden transition-all duration-500 shadow-2xl ${msg.role === 'user'
+                                                <Card className={`p-10 rounded-[3.5rem] border-none relative group overflow-hidden transition-all duration-700 shadow-[0_50px_100px_rgba(0,0,0,0.8)] ${msg.role === 'user'
                                                     ? 'bg-white/[0.03] text-slate-300 rounded-tr-none border-r border-white/5'
-                                                    : 'bg-[#0A0A0A] text-slate-200 rounded-tl-none border-l-2 border-l-blue-600/50'
+                                                    : 'bg-[#040404] text-slate-200 rounded-tl-none border-l-4 border-l-blue-600 shadow-[inset_0_0_40px_rgba(37,99,235,0.05)]'
                                                     }`}>
+                                                    {msg.role === 'neo' && <div className="absolute left-0 top-0 w-1 h-full bg-gradient-to-b from-blue-600 via-blue-400 to-transparent opacity-50 animate-pulse" />}
                                                     {msg.type === 'skeleton' ? (
                                                         <div className="space-y-4 p-2">
                                                             <Skeleton className="h-4 w-[300px] bg-white/5 rounded-lg" />
@@ -1050,7 +1051,7 @@ export function NeoDashboard() {
                                                             <Skeleton className="h-4 w-[280px] bg-white/5 rounded-lg opacity-50" />
                                                         </div>
                                                     ) : (
-                                                        <div className="prose prose-invert prose-p:leading-[1.8] prose-p:text-[15px] prose-p:opacity-90 prose-p:tracking-normal prose-p:text-slate-300 max-w-none prose-p:mb-10 last:prose-p:mb-0 selection:bg-blue-600/30">
+                                                        <div className="prose prose-invert prose-p:leading-[2.2] prose-p:text-[16px] prose-p:opacity-90 prose-p:tracking-wide prose-p:text-slate-300 max-w-none prose-p:mb-14 last:prose-p:mb-0 selection:bg-blue-600/40 font-medium">
                                                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                                                 {msg.content}
                                                             </ReactMarkdown>
@@ -1059,7 +1060,7 @@ export function NeoDashboard() {
 
                                                     {/* DATA MATRIX (TABLE) */}
                                                     {msg.type === 'table' && msg.data && (
-                                                        <div className="mt-10 border border-white/10 rounded-[2rem] overflow-hidden bg-black/40 backdrop-blur-3xl shadow-[0_30px_100px_rgba(0,0,0,0.4)] transition-all border-l-4 border-l-blue-600">
+                                                        <div className="mt-14 border border-white/10 rounded-[2.5rem] overflow-hidden bg-black/60 backdrop-blur-3xl shadow-[0_40px_120px_rgba(0,0,0,0.6)] transition-all border-l-4 border-l-blue-600">
                                                             <Table className="border-collapse">
                                                                 <TableHeader className="bg-white/[0.03]">
                                                                     <TableRow className="border-white/10 hover:bg-transparent">
@@ -1290,107 +1291,106 @@ export function NeoDashboard() {
                                 </div>
 
                                 <ScrollArea className="flex-1 h-full w-full">
-                                    <TabsContent value="general" className="p-6 m-0 space-y-10 h-full">
-                                        {/* 2X NEURAL TIMELINE (DATE/DAY SELECTOR) */}
-                                        <div className="mb-12">
-                                            <div className="flex justify-between items-end mb-6 px-4">
-                                                <h4 className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-600">Neural Timeline</h4>
-                                                <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{days[selectedDay].day} MAR {days[selectedDay].date}</span>
-                                            </div>
-                                            <div className="relative h-20 flex items-center group/timeline">
-                                                <Progress 
-                                                    value={(selectedDay / (days.length - 1)) * 100} 
-                                                    className="h-4 bg-white/5 rounded-full absolute w-full transition-all duration-700 shadow-inner" 
-                                                />
-                                                <div className="absolute w-full flex justify-between px-1">
-                                                    {days.map((d, i) => (
-                                                        <div 
-                                                            key={i} 
-                                                            onClick={() => setSelectedDay(i)}
-                                                            className="relative flex flex-col items-center cursor-pointer group/node"
-                                                        >
-                                                            <div className={`h-8 w-8 rounded-full border-2 transition-all duration-500 flex items-center justify-center relative z-10 ${
-                                                                i <= selectedDay 
-                                                                    ? 'bg-blue-600 border-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.6)]' 
-                                                                    : 'bg-[#0A0A0A] border-white/10 group-hover/node:border-white/30'
-                                                            }`}>
-                                                                {i === selectedDay && <div className="h-2 w-2 rounded-full bg-white animate-ping" />}
+                                    <TabsContent value="general" className="m-0 h-full overflow-hidden">
+                                        <ResizablePanelGroup direction="vertical" className="h-full w-full">
+                                            {/* TOP PANEL: TIMELINE & SUMMARY */}
+                                            <ResizablePanel defaultSize={45} minSize={20} className="p-6 flex flex-col">
+                                                <ScrollArea className="flex-1 w-full">
+                                                    <div className="space-y-10 min-w-[500px]">
+                                                        <div className="mb-12">
+                                                            <div className="flex justify-between items-end mb-6 px-4">
+                                                                <h4 className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-600">Neural Timeline</h4>
+                                                                <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{days[selectedDay].day} MAR {days[selectedDay].date}</span>
                                                             </div>
-                                                            <div className={`mt-4 flex flex-col items-center transition-all duration-500 ${i === selectedDay ? 'scale-110' : 'opacity-40'}`}>
-                                                                <span className="text-[10px] font-black uppercase tracking-widest text-white">{d.day}</span>
-                                                                <span className="text-[12px] font-black text-slate-400 mt-1">{d.date}</span>
+                                                            <div className="relative h-20 flex items-center group/timeline">
+                                                                <Progress 
+                                                                    value={(selectedDay / (days.length - 1)) * 100} 
+                                                                    className="h-4 bg-white/5 rounded-full absolute w-full transition-all duration-700 shadow-inner" 
+                                                                />
+                                                                <div className="absolute w-full flex justify-between px-1">
+                                                                    {days.map((d, i) => (
+                                                                        <div key={i} onClick={() => setSelectedDay(i)} className="relative flex flex-col items-center cursor-pointer group/node">
+                                                                            <div className={`h-8 w-8 rounded-full border-2 transition-all duration-500 flex items-center justify-center relative z-10 ${i <= selectedDay ? 'bg-blue-600 border-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.6)]' : 'bg-[#0A0A0A] border-white/10 group-hover/node:border-white/30'}`}>
+                                                                                {i === selectedDay && <div className="h-2 w-2 rounded-full bg-white animate-ping" />}
+                                                                            </div>
+                                                                            <div className={`mt-4 flex flex-col items-center transition-all duration-500 ${i === selectedDay ? 'scale-110' : 'opacity-40'}`}>
+                                                                                <span className="text-[10px] font-black uppercase tracking-widest text-white">{d.day}</span>
+                                                                                <span className="text-[12px] font-black text-slate-400 mt-1">{d.date}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
 
-                                        <Accordion type="single" collapsible className="w-full" defaultValue="summary">
-                                            <AccordionItem value="summary" className="border-white/5">
-                                                <AccordionTrigger className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-600 hover:no-underline hover:text-blue-500 transition-all py-6">
-                                                    Cycle Executive Brief
-                                                </AccordionTrigger>
-                                                <AccordionContent className="pt-4 overflow-visible">
-                                                    <div className="p-5 bg-white/[0.03] rounded-[2rem] border border-white/5 italic text-[14px] text-slate-400 leading-[1.8] relative shadow-inner w-full break-words overflow-hidden">
-                                                        <div className="absolute top-6 left-6 h-4 w-4 text-blue-900 opacity-30"><MessageSquare className="h-full w-full" /></div>
-                                                        <div className="whitespace-pre-wrap pl-8">"{currentSession?.summary}"</div>
+                                                        <Accordion type="single" collapsible className="w-full" defaultValue="summary">
+                                                            <AccordionItem value="summary" className="border-white/5">
+                                                                <AccordionTrigger className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-600 hover:no-underline hover:text-blue-500 transition-all py-6">
+                                                                    Cycle Executive Brief
+                                                                </AccordionTrigger>
+                                                                <AccordionContent className="pt-4">
+                                                                    <div className="p-6 bg-white/[0.03] rounded-[2rem] border border-white/5 italic text-[14px] text-slate-400 leading-[1.8] relative shadow-inner w-full break-words">
+                                                                        <div className="absolute top-6 left-6 h-4 w-4 text-blue-900 opacity-30"><MessageSquare className="h-full w-full" /></div>
+                                                                        <div className="whitespace-pre-wrap pl-8">"{currentSession?.summary}"</div>
+                                                                    </div>
+                                                                </AccordionContent>
+                                                            </AccordionItem>
+                                                        </Accordion>
                                                     </div>
-                                                </AccordionContent>
-                                            </AccordionItem>
-                                            <AccordionItem value="actions" className="border-white/5">
-                                                <AccordionTrigger className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-600 hover:no-underline hover:text-blue-500 transition-all py-6">
-                                                    Action Vector Matrix
-                                                </AccordionTrigger>
-                                                <AccordionContent className="space-y-6 pt-8">
-                                                    {[
-                                                        { text: "Neural load balancing", q: "P1", status: "Active" },
-                                                        { text: "Legacy theme purge", q: "P1", status: "Done" }
-                                                    ].map((a, i) => (
-                                                        <div key={i} className="flex items-center gap-6 p-6 rounded-[2rem] bg-white/[0.02] border border-white/5 group hover:bg-blue-600/10 hover:border-blue-600/30 transition-all cursor-pointer shadow-xl">
-                                                            <div className={`h-3 w-3 rounded-full shadow-[0_0_20px_currentColor] transition-all ${a.status === 'Done' ? 'text-green-500 bg-green-500' : 'text-blue-500 bg-blue-500'}`} />
-                                                            <span className="text-[13px] font-bold text-slate-300 flex-1">{a.text}</span>
-                                                            <Badge className="bg-black/50 border-white/5 text-[9px] font-black text-slate-600 px-3">{a.q}</Badge>
+                                                    <ScrollBar orientation="horizontal" />
+                                                </ScrollArea>
+                                            </ResizablePanel>
+
+                                            <ResizableHandle withHandle className="bg-blue-600/20 h-1.5 hover:h-2 hover:bg-blue-500 transition-all duration-300" />
+
+                                            {/* BOTTOM PANEL: ACTIONS & METRICS */}
+                                            <ResizablePanel defaultSize={55} minSize={20} className="p-6 mt-4 flex flex-col">
+                                                <ScrollArea className="flex-1 w-full">
+                                                    <div className="space-y-12 pb-10 min-w-[500px]">
+                                                        <Accordion type="single" collapsible className="w-full" defaultValue="actions">
+                                                            <AccordionItem value="actions" className="border-white/5">
+                                                                <AccordionTrigger className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-600 hover:no-underline hover:text-blue-500 transition-all py-6">
+                                                                    Action Vector Matrix
+                                                                </AccordionTrigger>
+                                                                <AccordionContent className="space-y-6 pt-8">
+                                                                    {[{ text: "Neural load balancing", q: "P1", status: "Active" }, { text: "Legacy theme purge", q: "P2", status: "Done" }].map((a, i) => (
+                                                                        <div key={i} className="flex items-center gap-6 p-6 rounded-[2rem] bg-white/[0.02] border border-white/5 group hover:bg-blue-600/10 hover:border-blue-600/30 transition-all cursor-pointer shadow-xl">
+                                                                            <div className={`h-3 w-3 rounded-full shadow-[0_0_20px_currentColor] transition-all ${a.status === 'Done' ? 'text-green-500 bg-green-500' : 'text-blue-500 bg-blue-500'}`} />
+                                                                            <span className="text-[13px] font-bold text-slate-300 flex-1">{a.text}</span>
+                                                                            <Badge className="bg-black/50 border-white/5 text-[9px] font-black text-slate-600 px-3">{a.q}</Badge>
+                                                                        </div>
+                                                                    ))}
+                                                                </AccordionContent>
+                                                            </AccordionItem>
+                                                        </Accordion>
+
+                                                        <FieldGroup className="space-y-10">
+                                                            <Field>
+                                                                <FieldLabel className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-600 mb-6 flex justify-between w-full">Processing Intensity <span className="text-blue-500">88%</span></FieldLabel>
+                                                                <Progress value={88} className="h-1.5 bg-white/5 rounded-full" />
+                                                            </Field>
+                                                            <Field>
+                                                                <FieldLabel className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-600 mb-6 flex justify-between w-full">Context Depth <span className="text-amber-500">OPTIMAL</span></FieldLabel>
+                                                                <Progress value={95} className="h-1.5 bg-white/5 rounded-full" />
+                                                            </Field>
+                                                        </FieldGroup>
+
+                                                        <div className="p-8 bg-gradient-to-br from-blue-900/40 to-indigo-900/10 rounded-[2.5rem] border border-blue-600/30 relative overflow-hidden group shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all hover:scale-[1.02]">
+                                                            <div className="relative z-10 flex flex-col items-center text-center">
+                                                                <div className="h-12 w-12 rounded-2xl bg-blue-600 flex items-center justify-center mb-6 shadow-2xl opacity-80 group-hover:opacity-100 transition-opacity"><Zap className="h-6 w-6 text-white" /></div>
+                                                                <h5 className="text-white text-md font-black uppercase tracking-[0.3em] mb-4">Recursive Sync</h5>
+                                                                <p className="text-[13px] text-slate-400 leading-relaxed font-medium">Neo is now observing your project hierarchy in real-time.</p>
+                                                            </div>
                                                         </div>
-                                                    ))}
-                                                </AccordionContent>
-                                            </AccordionItem>
-                                        </Accordion>
-
-                                        <FieldGroup className="space-y-8">
-                                            <Field>
-                                                <FieldLabel className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-600 mb-6 flex justify-between w-full">
-                                                    Processing Intensity
-                                                    <span className="text-blue-500">88%</span>
-                                                </FieldLabel>
-                                                <Progress value={88} className="h-1.5 bg-white/5 rounded-full" />
-                                                <FieldDescription className="mt-4 text-[11px] text-slate-700 lowercase leading-relaxed">Neural clusters operating at high spectral output. Latency minimal.</FieldDescription>
-                                            </Field>
-
-                                            <Field>
-                                                <FieldLabel className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-600 mb-6 flex justify-between w-full">
-                                                    Context Depth
-                                                    <span className="text-amber-500">OPTIMAL</span>
-                                                </FieldLabel>
-                                                <Progress value={95} className="h-1.5 bg-white/5 rounded-full" />
-                                                <FieldDescription className="mt-4 text-[11px] text-slate-700 lowercase leading-relaxed">Systemic semantic reach across all available datasets is at peak potential.</FieldDescription>
-                                            </Field>
-                                        </FieldGroup>
-
-                                        <div className="p-8 bg-gradient-to-br from-blue-900/40 to-indigo-900/10 rounded-[2.5rem] border border-blue-600/30 relative overflow-hidden group shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all hover:scale-[1.02]">
-                                            <div className="absolute -top-20 -right-20 h-60 w-60 bg-blue-600/10 blur-[100px] group-hover:bg-blue-600/20 transition-all" />
-                                            <div className="relative z-10 flex flex-col items-center text-center">
-                                                <div className="h-12 w-12 rounded-2xl bg-blue-600 flex items-center justify-center mb-6 shadow-2xl">
-                                                    <Zap className="h-6 w-6 text-white" />
-                                                </div>
-                                                <h5 className="text-white text-md font-black uppercase tracking-[0.3em] mb-4">Recursive Sync</h5>
-                                                <p className="text-[13px] text-slate-400 leading-relaxed font-medium">Neo is now observing your project hierarchy in real-time. Recursive intelligence applied.</p>
-                                            </div>
-                                        </div>
+                                                    </div>
+                                                    <ScrollBar orientation="horizontal" />
+                                                </ScrollArea>
+                                            </ResizablePanel>
+                                        </ResizablePanelGroup>
                                     </TabsContent>
 
                                     <TabsContent value="team" className="p-10 m-0 space-y-8">
-                                        <div className="space-y-6">
+                                        <div className="space-y-6 min-w-[500px]">
                                             {currentSession?.attendees?.map((name, i) => (
                                                 <Item key={i} className="p-0 border-none bg-transparent hover:bg-transparent">
                                                     <ItemContent className="bg-white/[0.03] border border-white/5 p-6 rounded-[2.5rem] transition-all hover:border-blue-600/30 hover:bg-blue-600/5 group/item shadow-2xl">
@@ -1413,6 +1413,7 @@ export function NeoDashboard() {
                                             </Button>
                                         </div>
                                     </TabsContent>
+                                    <ScrollBar orientation="horizontal" />
                                 </ScrollArea>
 
                                 <div className="p-10 border-t border-white/5 bg-[#050505]/80 backdrop-blur-xl">
