@@ -2,8 +2,6 @@
 
 import * as React from "react"
 import { useState, useEffect, useRef } from "react"
-import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
 import {
     ResizableHandle,
     ResizablePanel,
@@ -180,8 +178,7 @@ import {
     Cpu,
     Activity,
     Lock,
-    Info,
-    Menu
+    Info
 } from "lucide-react"
 
 // TYPES & MOCK DATA
@@ -212,9 +209,9 @@ const DUMMY_SESSIONS: ChatSession[] = [
         isMeeting: true,
         summary: "Finalizing the 2026 neural roadmap with focus on AI scalability and dark-matter logic.",
         messages: [
-            { role: "neo", content: "Neutral networks initialized, kiri. I'm ready to capture the strategy discussion. Who's leading the core sync today? 🚀", timestamp: "10:00 AM" }
+            { role: "neo", content: "Neutral networks initialized. I'm ready to capture the strategy discussion. Who's leading the core sync today? 🚀", timestamp: "10:00 AM" }
         ],
-        attendees: ["kiri", "Alex", "Neo AI"]
+        attendees: ["Harsh", "Alex", "Neo AI"]
     },
     {
         id: "2",
@@ -223,7 +220,7 @@ const DUMMY_SESSIONS: ChatSession[] = [
         isMeeting: false,
         summary: "Applying deep dark aesthetics across all 34 core modules.",
         messages: [
-            { role: "neo", content: "The dark evolution is complete. All 34 components are now harmonized for your terminal. Ready for field testing? 💡", timestamp: "02:15 PM" }
+            { role: "neo", content: "The dark evolution is complete. All 34 components are now harmonized. Ready for field testing? 💡", timestamp: "02:15 PM" }
         ]
     }
 ]
@@ -242,7 +239,7 @@ export function NeoDashboard() {
     const [activeTab, setActiveTab] = useState("home")
 
     // User Identity State
-    const [userName, setUserName] = useState("kiri")
+    const [userName, setUserName] = useState("Operator 01")
     const [userPfp, setUserPfp] = useState("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=80")
     const [neoName, setNeoName] = useState("Terminal Neo")
     const [neoPfp, setNeoPfp] = useState("")
@@ -252,12 +249,7 @@ export function NeoDashboard() {
 
     // Layout Refs
     const leftPanelRef = useRef<any>(null)
-    const archivePanelRef = useRef<any>(null)
-    const chatPanelRef = useRef<any>(null)
-    const rightPanelRef = useRef<any>(null)
-    const [isLeftCollapsed, setIsLeftCollapsed] = useState(true)
-    const [isArchiveCollapsed, setIsArchiveCollapsed] = useState(true)
-    const [isRightCollapsed, setIsRightCollapsed] = useState(true)
+    const [isLeftCollapsed, setIsLeftCollapsed] = useState(false)
 
     const scrollRef = useRef<HTMLDivElement>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -316,37 +308,6 @@ export function NeoDashboard() {
 
     const currentSession = sessions.find(s => s.id === currentSessionId)
 
-    // UTILITIES
-    const parseNeoResponse = (content: string): Partial<Message> => {
-        // Look for JSON chart blocks: ```json { "type": "chart", "data": [...] } ```
-        const chartRegex = /```json\s*([\s\S]*?)\s*```/g
-        let match
-        let lastMatch = null
-
-        while ((match = chartRegex.exec(content)) !== null) {
-            try {
-                const parsed = JSON.parse(match[1])
-                if (parsed.type === "chart" || parsed.type === "table") {
-                    lastMatch = parsed
-                }
-            } catch (e) {
-                // Not the JSON we're looking for or malformed
-            }
-        }
-
-        if (lastMatch) {
-            // Clean up the content to remove the extracted JSON block if desired, 
-            // but for now we'll just keep it and let the UI render the specialized component.
-            return {
-                type: lastMatch.type as Message["type"],
-                data: lastMatch.data,
-                content: content.replace(chartRegex, "").trim() || content
-            }
-        }
-
-        return { content }
-    }
-
     // LOGIC
     const handleSend = async () => {
         if ((!input.trim() && attachments.length === 0) || !currentSessionId || isTyping) return
@@ -360,11 +321,9 @@ export function NeoDashboard() {
 
         setInput("")
         setAttachments([])
-        
-        const updatedHistory = currentSession?.messages.concat(userMsg) || [userMsg]
         setSessions(prev => prev.map(s => {
             if (s.id === currentSessionId) {
-                return { ...s, messages: updatedHistory }
+                return { ...s, messages: [...s.messages, userMsg] }
             }
             return s
         }))
@@ -372,30 +331,19 @@ export function NeoDashboard() {
         setIsTyping(true)
 
         try {
-            // Mapping 'neo' to 'assistant' and purifying for the API
-            const messages = updatedHistory.map(m => ({
-                role: m.role === "neo" ? "assistant" : m.role,
-                content: m.content
-            }))
-
             const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ messages }),
+                body: JSON.stringify({ messages: currentSession?.messages.concat(userMsg) || [userMsg] })
             })
 
             if (!response.ok) throw new Error("Neural link failed.")
 
-            const rawData = await response.json()
-            const parsedData = { 
-                ...rawData, 
-                ...parseNeoResponse(rawData.content),
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            }
+            const data = await response.json()
 
             setSessions(prev => prev.map(s => {
                 if (s.id === currentSessionId) {
-                    const newMessages = [...s.messages, parsedData as Message]
+                    const newMessages = [...s.messages, data]
                     return {
                         ...s,
                         messages: newMessages,
@@ -450,42 +398,12 @@ export function NeoDashboard() {
         }
     }
 
-    const [isZenMode, setIsZenMode] = useState(true)
-
-    const toggleSidebars = () => {
-        if (isZenMode) {
-            // Expand to 'Ultra Vision' percentages
-            leftPanelRef.current?.expand(20)
-            archivePanelRef.current?.expand(30)
-            rightPanelRef.current?.expand(35)
-            setIsZenMode(false)
-            setIsLeftCollapsed(false)
-            setIsArchiveCollapsed(false)
-            setIsRightCollapsed(false)
-        } else {
-            leftPanelRef.current?.collapse()
-            archivePanelRef.current?.collapse()
-            rightPanelRef.current?.collapse()
-            setIsZenMode(true)
-            setIsLeftCollapsed(true)
-            setIsArchiveCollapsed(true)
-            setIsRightCollapsed(true)
-        }
-    }
-
     const createNewSession = (isMeeting: boolean) => {
-        const hour = new Date().getHours()
-        let greeting = "Neural uplink established. Ready for input, kiri."
-        
-        if (hour < 12) greeting = "Good morning, kiri. Neural cores are primed for early-cycle optimization. 🌅"
-        else if (hour < 18) greeting = "Good afternoon, kiri. Mid-cycle sync is active. What's on our roadmap? ⚡"
-        else greeting = "Good evening, kiri. Late-cycle synthesis initialized. Ready for deep-work protocol. 🌙"
-
         const newSession: ChatSession = {
             id: Date.now().toString(),
             title: isMeeting ? "New Meeting Sync" : "New Creative Session",
             date: new Date().toISOString().split('T')[0],
-            messages: [{ role: "neo", content: greeting, timestamp: "Just now" }],
+            messages: [{ role: "neo", content: "New vector initialized. Ready for input.", timestamp: "Just now" }],
             summary: "New session started.",
             isMeeting
         }
@@ -509,7 +427,7 @@ export function NeoDashboard() {
     return (
         <div className="h-screen w-full overflow-hidden bg-[#050505] text-slate-300 font-sans selection:bg-blue-600/30">
             <CommandDialog open={isOpenCommand} onOpenChange={setIsOpenCommand}>
-                <Command className="bg-[#0A0A0A] border-slate-800 rounded-lg border-none shadow-2xl">
+                <div className="bg-[#0A0A0A] border-slate-800 rounded-lg">
                     <CommandInput placeholder="Search archives, insights, or commands..." className="text-white" />
                     <CommandList className="text-slate-400">
                         <CommandEmpty>No results found.</CommandEmpty>
@@ -533,7 +451,7 @@ export function NeoDashboard() {
                             </CommandItem>
                         </CommandGroup>
                     </CommandList>
-                </Command>
+                </div>
             </CommandDialog>
 
             <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
@@ -608,20 +526,25 @@ export function NeoDashboard() {
                 {/* 1. FAR LEFT: COMMAND SIDEBAR (Fixed Nav) */}
                 <ResizablePanel
                     ref={leftPanelRef}
-                    defaultSize={0}
-                    minSize={0}
-                    maxSize={50}
+                    defaultSize={4}
+                    minSize={3}
+                    maxSize={10}
                     collapsible={true}
-                    className="border-r border-blue-500/15 bg-gradient-to-b from-[#111111] via-[#0D0D0D] to-[#0A0A0A] transition-all duration-500 shadow-[2px_0_30px_rgba(37,99,235,0.05)]"
+                    onCollapse={() => setIsLeftCollapsed(true)}
+                    onExpand={() => setIsLeftCollapsed(false)}
+                    className="border-r border-white/5 bg-[#080808] transition-all duration-300"
                 >
                     <div className="flex flex-col items-center h-full py-6">
                         <Button
                             variant="ghost"
                             size="icon"
-                            onClick={toggleSidebars}
-                            className={`mb-8 hover:bg-white/5 rounded-xl transition-all active:scale-90 ${isLeftCollapsed ? 'animate-pulse text-blue-500 bg-blue-500/10' : 'text-slate-500 hover:text-white'}`}
+                            onClick={() => {
+                                if (isLeftCollapsed) leftPanelRef.current?.expand()
+                                else leftPanelRef.current?.collapse()
+                            }}
+                            className="mb-8 hover:bg-white/5 rounded-xl text-slate-500 hover:text-white transition-all active:scale-90"
                         >
-                            <Menu className={`h-5 w-5 transition-transform duration-500 ${!isLeftCollapsed ? 'rotate-90' : ''}`} />
+                            <ChevronRight className={`h-4 w-4 transition-transform duration-500 ${!isLeftCollapsed ? 'rotate-180' : ''}`} />
                         </Button>
 
                         <div className={`h-10 w-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white mb-10 shadow-[0_0_20px_rgba(37,99,235,0.2)] transition-all duration-500 ${isLeftCollapsed ? 'scale-75 opacity-50' : ''}`}>
@@ -760,21 +683,14 @@ export function NeoDashboard() {
                     </div>
                 </ResizablePanel>
 
-                <ResizableHandle withHandle className="bg-blue-600/30 w-[1px] hover:bg-blue-500 transition-colors" />
+                <ResizableHandle withHandle className="bg-white/5 w-[1px]" />
 
                 {/* 2. MIDDLE: ARCHIVES (CONTENT INDEX) */}
-                <ResizablePanel 
-                    ref={archivePanelRef}
-                    defaultSize={0} 
-                    minSize={0} 
-                    maxSize={50} 
-                    collapsible={true}
-                    className="bg-gradient-to-br from-[#0D0D0D] to-[#050505] border-r border-blue-500/15"
-                >
+                <ResizablePanel defaultSize={20} minSize={15} maxSize={30} className="bg-[#080808]">
                     <div className="flex flex-col h-full shadow-2xl">
                         <div className="p-6 border-b border-white/5 bg-[#080808]/80 backdrop-blur-2xl sticky top-0 z-20">
                             <div className="flex items-center justify-between mb-5">
-                                <h1 className="text-[11px] font-black tracking-[0.4em] text-white/40 uppercase font-heading">Intelligence Index</h1>
+                                <h1 className="text-[11px] font-black tracking-[0.4em] text-white/40 uppercase">Intelligence Index</h1>
                                 <Button size="icon" variant="ghost" onClick={() => createNewSession(false)} className="h-8 w-8 rounded-xl hover:bg-white/10 text-white/60">
                                     <Plus className="h-4 w-4" />
                                 </Button>
@@ -822,7 +738,7 @@ export function NeoDashboard() {
                                                             {s.isMeeting ? <Video className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />}
                                                         </div>
                                                         <div className="truncate flex-1">
-                                                            <div className={`text-[13px] font-black truncate leading-tight transition-colors font-heading ${currentSessionId === s.id ? 'text-white' : 'text-slate-400'}`}>{s.title}</div>
+                                                            <div className={`text-[13px] font-bold truncate leading-tight transition-colors ${currentSessionId === s.id ? 'text-white' : 'text-slate-400'}`}>{s.title}</div>
                                                             <div className="text-[10px] opacity-40 font-medium truncate mt-1 flex items-center gap-2">
                                                                 <Clock className="h-2.5 w-2.5" /> {s.date}
                                                             </div>
@@ -872,27 +788,20 @@ export function NeoDashboard() {
                     </div>
                 </ResizablePanel>
 
-                <ResizableHandle withHandle className="bg-blue-600/30 w-[1px] hover:bg-blue-500 transition-colors" />
+                <ResizableHandle withHandle className="bg-white/5 w-[1px]" />
 
-                {/* 3. MAIN CHAT STAGE */}
-                <ResizablePanel ref={chatPanelRef} defaultSize={100} minSize={40}>
-                    <div className="flex-1 flex flex-col relative h-full bg-[#050505]">
+                {/* 3. RIGHT: MAIN STAGE & ANALYTICS */}
+                <ResizablePanel defaultSize={76}>
+                    <div className="flex h-full bg-[#050505] shadow-2xl">
+
                         {/* 3.1 CHAT CORE */}
-                        <div className="flex-1 flex flex-col relative h-full">
+                        <div className="flex-1 flex flex-col border-r border-white/5 relative">
                             {/* HEADER ENGINE */}
                             <Menubar className="h-16 border-b border-white/5 bg-[#050505]/80 backdrop-blur-3xl px-8 flex justify-between rounded-none border-t-0 border-x-0">
                                 <div className="flex items-center gap-6">
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={toggleSidebars}
-                                        className={`h-10 w-10 transition-all rounded-xl hover:bg-white/5 ${isZenMode ? 'text-blue-500 animate-pulse bg-blue-500/10' : 'text-slate-500 hover:text-white'}`}
-                                    >
-                                        <Menu className={`h-5 w-5 transition-transform duration-500 ${!isZenMode ? 'rotate-90' : ''}`} />
-                                    </Button>
                                     <div className="flex items-center gap-3">
                                         <div className="h-2 w-2 rounded-full bg-blue-600 animate-ping" />
-                                        <span className="text-[12px] font-black uppercase text-white tracking-[0.3em] font-heading">{currentSession?.title}</span>
+                                        <span className="text-[12px] font-black uppercase text-white tracking-[0.3em]">{currentSession?.title}</span>
                                     </div>
                                     <Separator orientation="vertical" className="h-5 bg-white/10" />
                                     <Badge className={`px-3 py-1 text-[9px] uppercase font-black tracking-widest border-none ${isMeetingMode ? 'bg-amber-600/20 text-amber-500' : 'bg-blue-600/20 text-blue-500'}`}>
@@ -915,35 +824,13 @@ export function NeoDashboard() {
                                     <TooltipProvider>
                                         <Tooltip>
                                             <TooltipTrigger asChild>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    className="h-10 w-10 text-slate-500 hover:text-white transition-all rounded-xl" 
-                                                    onClick={() => createNewSession(isMeetingMode)}
-                                                >
+                                                <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-500 hover:text-white transition-all rounded-xl" onClick={() => createNewSession(isMeetingMode)}>
                                                     <Plus className="h-4 w-4" />
                                                 </Button>
                                             </TooltipTrigger>
                                             <TooltipContent>New Cycle</TooltipContent>
                                         </Tooltip>
                                     </TooltipProvider>
-
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => {
-                                            if (isRightCollapsed) {
-                                                rightPanelRef.current?.expand(35)
-                                                setIsRightCollapsed(false)
-                                            } else {
-                                                rightPanelRef.current?.collapse()
-                                                setIsRightCollapsed(true)
-                                            }
-                                        }}
-                                        className={`h-10 w-10 transition-all rounded-xl hover:bg-white/5 ${isRightCollapsed ? 'text-blue-500 animate-pulse bg-blue-500/10' : 'text-slate-500 hover:text-white'}`}
-                                    >
-                                        <Menu className={`h-5 w-5 transition-transform duration-500 ${!isRightCollapsed ? 'rotate-90' : ''}`} />
-                                    </Button>
                                 </div>
                             </Menubar>
 
@@ -983,8 +870,8 @@ export function NeoDashboard() {
 
                                             <div className={`flex flex-col space-y-4 max-w-[85%] ${msg.role === 'user' ? 'items-end' : ''}`}>
                                                 <div className="flex items-center gap-3 px-2">
-                                                    <span className={`text-[10px] font-black uppercase tracking-[0.3em] font-heading ${msg.role === 'neo' ? 'text-blue-500' : 'text-slate-600'}`}>
-                                                        {msg.role === 'neo' ? <span className="special-word">Neo AI</span> : userName}
+                                                    <span className={`text-[10px] font-black uppercase tracking-[0.3em] ${msg.role === 'neo' ? 'text-blue-500' : 'text-slate-600'}`}>
+                                                        {msg.role === 'neo' ? neoName : userName}
                                                     </span>
                                                     <span className="text-[10px] text-white/5">•</span>
                                                     <span className="text-[10px] text-slate-800 font-bold">{msg.timestamp}</span>
@@ -1001,10 +888,8 @@ export function NeoDashboard() {
                                                             <Skeleton className="h-4 w-[280px] bg-white/5 rounded-lg opacity-50" />
                                                         </div>
                                                     ) : (
-                                                        <div className="prose prose-invert prose-p:leading-[1.8] prose-p:text-[16px] prose-p:font-serif prose-p:opacity-90 prose-p:tracking-wide prose-p:text-slate-300 max-w-none">
-                                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                                                {msg.content}
-                                                            </ReactMarkdown>
+                                                        <div className="prose prose-invert leading-[1.8] text-[15px] font-medium opacity-90 tracking-wide">
+                                                            {msg.content}
                                                         </div>
                                                     )}
 
@@ -1213,21 +1098,9 @@ export function NeoDashboard() {
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </ResizablePanel>
 
-                <ResizableHandle withHandle className="bg-blue-600/30 w-[1px] hover:bg-blue-500 transition-colors" />
-
-                {/* 4. SYSTEM INSIGHTS (FAR RIGHT) */}
-                <ResizablePanel 
-                    ref={rightPanelRef}
-                    defaultSize={0}
-                    minSize={0}
-                    maxSize={50}
-                    collapsible={true}
-                    className="bg-[#050505] shadow-2xl border-l border-blue-500/15"
-                >
-                    <div className="flex flex-col h-full relative z-30">
+                        {/* 3.2 INSIGHTS & TELEMETRY (FAR RIGHT) */}
+                        <div className="w-[440px] flex flex-col bg-[#050505] shadow-2xl relative z-30">
                             <Tabs value={summaryView} onValueChange={(v: any) => setSummaryView(v)} className="flex-1 flex flex-col">
                                 <div className="p-10 border-b border-white/5 bg-[#050505]/50 backdrop-blur-xl">
                                     <div className="flex items-center justify-between mb-8">
@@ -1346,6 +1219,7 @@ export function NeoDashboard() {
                                 </div>
                             </Tabs>
                         </div>
+                    </div>
                 </ResizablePanel>
             </ResizablePanelGroup>
         </div>

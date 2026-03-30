@@ -5,6 +5,7 @@ import * as ResizablePrimitive from "react-resizable-panels"
 
 import { cn } from "@/lib/utils"
 
+// ✅ Panel Group
 const ResizablePanelGroup = React.forwardRef<
   ResizablePrimitive.GroupImperativeHandle,
   ResizablePrimitive.GroupProps & {
@@ -13,27 +14,29 @@ const ResizablePanelGroup = React.forwardRef<
 >(({ className, direction, ...props }, ref) => (
   <ResizablePrimitive.Group
     {...props}
+    direction={direction}
     groupRef={ref as any}
-    id={props.id?.toString()}
-    className={cn(
-      "flex h-full w-full",
-      className
-    )}
+    className={cn("flex h-full w-full", className)}
   />
 ))
 ResizablePanelGroup.displayName = "ResizablePanelGroup"
 
+// ✅ Panel
 const ResizablePanel = React.forwardRef<
   ResizablePrimitive.PanelImperativeHandle,
-  React.ComponentProps<typeof ResizablePrimitive.Panel>
->(({ ...props }, ref) => (
-  <ResizablePrimitive.Panel 
+  ResizablePrimitive.PanelProps
+>(({ className, onCollapse, onExpand, ...props }, ref) => (
+  <ResizablePrimitive.Panel
     {...props}
     panelRef={ref as any}
+    onCollapse={onCollapse}
+    onExpand={onExpand}
+    className={className}
   />
 ))
 ResizablePanel.displayName = "ResizablePanel"
 
+// ✅ Handle
 const ResizableHandle = React.forwardRef<
   HTMLDivElement,
   ResizablePrimitive.SeparatorProps & {
